@@ -46,6 +46,8 @@ def init_db() -> None:
                 current_translation TEXT NOT NULL,
                 model TEXT NOT NULL,
                 origin TEXT NOT NULL,
+                -- Tracks copy actions performed from inside the Python app.
+                -- Host-side shortcut copies can happen after docker exec returns.
                 copied_to_clipboard INTEGER NOT NULL DEFAULT 0
             );
 

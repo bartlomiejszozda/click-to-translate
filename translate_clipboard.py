@@ -52,6 +52,8 @@ def main():
             target_language=args.target_language,
             model=get_model_name(),
             origin="shortcut",
+            # The host shortcut copies stdout after docker exec exits, so this
+            # starts false and is only updated when Python itself writes xclip.
             copied_to_clipboard=False,
         )
 

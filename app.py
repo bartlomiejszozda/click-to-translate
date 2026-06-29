@@ -31,6 +31,7 @@ def init_state() -> None:
         "translated_text": "",
         "target_language": DEFAULT_TARGET_LANGUAGE,
         "notice": None,
+        "draft_mode": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -63,6 +64,7 @@ def load_translation(translation_id: int, include_target_language: bool = True) 
     st.session_state.selected_translation_id = item["id"]
     st.session_state.source_text = item["source_text"]
     st.session_state.translated_text = item["current_translation"]
+    st.session_state.draft_mode = False
     if include_target_language:
         st.session_state.target_language = item["target_language"]
     return True
@@ -86,13 +88,18 @@ def save_new_translation(
     st.session_state.selected_translation_id = translation_id
     st.session_state.source_text = source_text
     st.session_state.translated_text = translated_text
+    st.session_state.draft_mode = False
     return translation_id
 
 
 init_state()
 
 history_items = list_translations(limit=50)
-if st.session_state.selected_translation_id is None and history_items:
+if (
+    st.session_state.selected_translation_id is None
+    and history_items
+    and not st.session_state.draft_mode
+):
     load_translation(history_items[0]["id"])
 
 with st.sidebar:
@@ -102,21 +109,38 @@ with st.sidebar:
         st.session_state.selected_translation_id = None
         st.session_state.source_text = ""
         st.session_state.translated_text = ""
+        st.session_state.draft_mode = True
         st.rerun()
 
     if history_items:
         history_by_id = {item["id"]: item for item in history_items}
         history_ids = [item["id"] for item in history_items]
-        current_id = st.session_state.selected_translation_id
-        selected_index = history_ids.index(current_id) if current_id in history_ids else 0
+        if st.session_state.draft_mode:
+            history_options = ["draft", *history_ids]
+            current_option = "draft"
+        else:
+            history_options = history_ids
+            current_option = st.session_state.selected_translation_id
+
+        if current_option in history_options:
+            selected_index = history_options.index(current_option)
+        else:
+            selected_index = 0
+
         chosen_id = st.radio(
             "Recent translations",
-            history_ids,
+            history_options,
             index=selected_index,
-            format_func=lambda item_id: format_history_item(history_by_id[item_id]),
+            format_func=lambda item_id: (
+                "New translation"
+                if item_id == "draft"
+                else format_history_item(history_by_id[item_id])
+            ),
             label_visibility="collapsed",
         )
-        if chosen_id != current_id:
+        if chosen_id == "draft":
+            pass
+        elif chosen_id != st.session_state.selected_translation_id:
             load_translation(chosen_id)
             st.rerun()
     else:
@@ -136,7 +160,10 @@ st.text_input(
     key="target_language",
 )
 
-read_col, translate_col, copy_col = st.columns(3)
+new_col, read_col, translate_col, copy_col = st.columns(4)
+
+with new_col:
+    new_translation_clicked = st.button("New translation", use_container_width=True)
 
 with read_col:
     read_clipboard_clicked = st.button("Read + translate", use_container_width=True)
@@ -150,6 +177,13 @@ with copy_col:
         disabled=not st.session_state.translated_text,
         use_container_width=True,
     )
+
+if new_translation_clicked:
+    st.session_state.selected_translation_id = None
+    st.session_state.source_text = ""
+    st.session_state.translated_text = ""
+    st.session_state.draft_mode = True
+    st.rerun()
 
 if read_clipboard_clicked:
     with st.spinner("Reading clipboard and translating..."):

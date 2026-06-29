@@ -46,7 +46,7 @@ container stops or the image is rebuilt.
 Bind this command to a custom desktop keyboard shortcut:
 
 ```bash
-/home/bzd/projects/my_llm_projects/translator/clipboard_to_docker.sh
+~/projects/my_llm_projects/translator/clipboard_to_docker.sh
 ```
 
 Usage:
@@ -63,7 +63,7 @@ Streamlit app.
 To target another language from the shortcut:
 
 ```bash
-TARGET_LANGUAGE=Polish /home/bzd/projects/my_llm_projects/translator/clipboard_to_docker.sh
+TARGET_LANGUAGE=Polish ~/projects/my_llm_projects/translator/clipboard_to_docker.sh
 ```
 
 ## Streamlit Workflow
