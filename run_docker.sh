@@ -2,10 +2,18 @@
 
 set -euo pipefail
 
+ENV_FILE="${TRANSLATOR_ENV_FILE:-$HOME/.config/translator/.env}"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  printf '%s\n' "Missing env file: $ENV_FILE" >&2
+  printf '%s\n' "Create it or set TRANSLATOR_ENV_FILE to another path." >&2
+  exit 1
+fi
+
 xhost +local:docker
 
 docker run -d --rm --name translator \
-  --env-file .env \
+  --env-file "$ENV_FILE" \
   -p 8501:8501 \
   -e DISPLAY="$DISPLAY" \
   -e STREAMLIT_SERVER_HEADLESS=true \

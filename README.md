@@ -3,6 +3,17 @@
 Fast clipboard translation through a host keyboard shortcut, plus a Streamlit
 window for translation history and chat-based revisions.
 
+## Configuration
+
+Requires an env file. Default: `~/.config/translator/.env`. Use `TRANSLATOR_ENV_FILE` to use a different path.
+
+```bash
+API_KEY=sk-...
+```
+
+Optional: `MODEL`, `OPENAI_BASE_URL`
+Restart the container after editing the file.
+
 ## Build
 
 ```bash
@@ -21,8 +32,8 @@ Run the app with a persistent SQLite history volume:
 
 ```bash
 docker run --rm --name translator \
+  --env-file "${TRANSLATOR_ENV_FILE:-$HOME/.config/translator/.env}" \
   -p 8501:8501 \
-  -e API_KEY="$API_KEY" \
   -e DISPLAY="$DISPLAY" \
   -e XAUTHORITY=/tmp/.docker.xauth \
   -e TRANSLATOR_DB_PATH=/app/data/translations.sqlite3 \

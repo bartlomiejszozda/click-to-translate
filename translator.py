@@ -3,8 +3,8 @@ import os
 from openai import OpenAI
 
 
-DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_MODEL = "gpt-5.6-luna"
 DEFAULT_TARGET_LANGUAGE = "English"
 
 
@@ -12,9 +12,20 @@ def get_model_name() -> str:
     return os.getenv("MODEL", DEFAULT_MODEL)
 
 
+def _api_key() -> str:
+    key = os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError(
+            "No API key found. Set API_KEY (or OPENAI_API_KEY) in "
+            "~/.config/translator/.env and restart the container so docker "
+            "reads the file again."
+        )
+    return key.strip()
+
+
 def _client():
     return OpenAI(
-        api_key=os.environ["API_KEY"],
+        api_key=_api_key(),
         base_url=os.getenv("OPENAI_BASE_URL", DEFAULT_BASE_URL),
     )
 
