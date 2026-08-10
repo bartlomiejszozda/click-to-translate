@@ -74,12 +74,25 @@ def init_db() -> None:
                     ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS learning_chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                translation_id INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+                content TEXT NOT NULL,
+                FOREIGN KEY (translation_id)
+                    REFERENCES translations (id)
+                    ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_translations_updated_at
                 ON translations (updated_at DESC);
             CREATE INDEX IF NOT EXISTS idx_revisions_translation_id
                 ON revisions (translation_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_chat_messages_translation_id
                 ON chat_messages (translation_id, created_at ASC);
+            CREATE INDEX IF NOT EXISTS idx_learning_chat_messages_translation_id
+                ON learning_chat_messages (translation_id, created_at ASC);
             """
         )
         translation_columns = {
@@ -219,6 +232,21 @@ def get_chat_messages(translation_id: int):
         return [dict(row) for row in rows]
 
 
+def get_learning_chat_messages(translation_id: int):
+    init_db()
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, created_at, role, content
+            FROM learning_chat_messages
+            WHERE translation_id = ?
+            ORDER BY created_at ASC, id ASC
+            """,
+            (translation_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
 def get_revisions(translation_id: int):
     init_db()
     with connect() as conn:
@@ -287,6 +315,49 @@ def update_translation_from_chat(
             WHERE id = ?
             """,
             (revised_translation, now, translation_id),
+        )
+        conn.commit()
+
+
+def add_learning_chat_exchange(
+    translation_id: int,
+    user_message: str,
+    assistant_message: str,
+) -> None:
+    init_db()
+    now = utc_now()
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO learning_chat_messages (
+                translation_id,
+                created_at,
+                role,
+                content
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (translation_id, now, "user", user_message),
+        )
+        conn.execute(
+            """
+            INSERT INTO learning_chat_messages (
+                translation_id,
+                created_at,
+                role,
+                content
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (translation_id, now, "assistant", assistant_message),
+        )
+        conn.execute(
+            """
+            UPDATE translations
+            SET updated_at = ?
+            WHERE id = ?
+            """,
+            (now, translation_id),
         )
         conn.commit()
 

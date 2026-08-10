@@ -2,9 +2,11 @@ import streamlit as st
 
 from clipboard_io import ClipboardError, read_clipboard, write_clipboard
 from history_store import (
+    add_learning_chat_exchange,
     create_translation,
     get_chat_messages,
     get_db_path,
+    get_learning_chat_messages,
     get_revisions,
     get_translation,
     init_db,
@@ -15,6 +17,7 @@ from history_store import (
 )
 from translator import (
     DEFAULT_TARGET_LANGUAGE,
+    continue_learning_chat,
     generate_learning_suggestions,
     get_model_name,
     refine_translation,
@@ -262,73 +265,123 @@ if copy_clicked:
     except ClipboardError as exc:
         st.error(str(exc))
 
-st.text_area("Source text", height=180, key="source_text")
-
-if st.session_state.translated_text:
-    st.text_area(
-        "Current translation",
-        value=st.session_state.translated_text,
-        height=180,
-    )
-
 selected_id = st.session_state.selected_translation_id
-if selected_id is not None:
-    selected_item = get_translation(selected_id)
-    with st.container(border=True):
+if selected_id is None:
+    st.text_area("Source text", height=180, key="source_text")
+    st.caption("Translate text to start a history item and chat about it.")
+else:
+    translation_tab, learning_tab = st.tabs(["Translation", "Learning"])
+
+    with translation_tab:
+        st.text_area("Source text", height=180, key="source_text")
+
+        if st.session_state.translated_text:
+            st.text_area(
+                "Current translation",
+                value=st.session_state.translated_text,
+                height=180,
+            )
+
+        st.subheader("Chat refinement")
+        messages = get_chat_messages(selected_id)
+        if not messages:
+            st.caption("No feedback yet for this translation.")
+
+        for message in messages:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+
+        prompt = st.chat_input(
+            "Tell the translator what to change...",
+            key=f"translation_chat_input_{selected_id}",
+        )
+        if prompt:
+            item = get_translation(selected_id)
+            if item is None:
+                st.error("Selected translation was not found.")
+            else:
+                with st.spinner("Revising translation..."):
+                    try:
+                        revised_translation = refine_translation(
+                            source_text=item["source_text"],
+                            current_translation=item["current_translation"],
+                            user_feedback=prompt,
+                            target_language=item["target_language"],
+                            chat_messages=messages,
+                        )
+                        update_translation_from_chat(
+                            translation_id=selected_id,
+                            user_message=prompt,
+                            assistant_message=revised_translation,
+                            revised_translation=revised_translation,
+                        )
+                        st.session_state.translated_text = revised_translation
+                        st.session_state.notice = "Saved revised translation."
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Error: {exc}")
+
+        revisions = get_revisions(selected_id)
+        if revisions:
+            with st.expander("Revisions"):
+                for revision in revisions:
+                    st.caption(
+                        f"{compact_time(revision['created_at'])} - {revision['note']}"
+                    )
+                    st.text(revision["translation_text"])
+
+    with learning_tab:
+        selected_item = get_translation(selected_id)
         st.subheader("Learning suggestions")
         if selected_item and selected_item["learning_suggestions"]:
-            st.markdown(selected_item["learning_suggestions"])
+            with st.container(border=True):
+                st.markdown(selected_item["learning_suggestions"])
         else:
             st.caption(
                 "No suggestions are saved yet. For a new shortcut translation, "
                 "refresh the page in a moment while generation finishes."
             )
 
-if selected_id is not None:
-    st.subheader("Chat refinement")
+        st.subheader("Learning chat")
+        learning_messages = get_learning_chat_messages(selected_id)
+        if not learning_messages:
+            st.caption(
+                "Ask for an explanation, more examples, an exercise, or feedback "
+                "on your answer."
+            )
 
-    messages = get_chat_messages(selected_id)
-    if not messages:
-        st.caption("No feedback yet for this translation.")
+        for message in learning_messages:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
 
-    for message in messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-    prompt = st.chat_input("Tell the translator what to change...")
-    if prompt:
-        item = get_translation(selected_id)
-        if item is None:
-            st.error("Selected translation was not found.")
-        else:
-            with st.spinner("Revising translation..."):
-                try:
-                    revised_translation = refine_translation(
-                        source_text=item["source_text"],
-                        current_translation=item["current_translation"],
-                        user_feedback=prompt,
-                        target_language=item["target_language"],
-                        chat_messages=messages,
-                    )
-                    update_translation_from_chat(
-                        translation_id=selected_id,
-                        user_message=prompt,
-                        assistant_message=revised_translation,
-                        revised_translation=revised_translation,
-                    )
-                    st.session_state.translated_text = revised_translation
-                    st.session_state.notice = "Saved revised translation."
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Error: {exc}")
-
-    revisions = get_revisions(selected_id)
-    if revisions:
-        with st.expander("Revisions"):
-            for revision in revisions:
-                st.caption(
-                    f"{compact_time(revision['created_at'])} - {revision['note']}"
-                )
-                st.text(revision["translation_text"])
-else:
-    st.caption("Translate text to start a history item and chat about it.")
+        learning_prompt = st.chat_input(
+            "Ask your language coach...",
+            key=f"learning_chat_input_{selected_id}",
+        )
+        if learning_prompt:
+            if selected_item is None:
+                st.error("Selected translation was not found.")
+            else:
+                with st.spinner("Preparing a learning response..."):
+                    try:
+                        learning_response = continue_learning_chat(
+                            source_text=selected_item["source_text"],
+                            translated_text=selected_item["current_translation"],
+                            learning_suggestions=selected_item[
+                                "learning_suggestions"
+                            ],
+                            user_message=learning_prompt,
+                            target_language=selected_item["target_language"],
+                            chat_messages=learning_messages,
+                        )
+                        add_learning_chat_exchange(
+                            translation_id=selected_id,
+                            user_message=learning_prompt,
+                            assistant_message=learning_response,
+                        )
+                        with st.chat_message("user"):
+                            st.write(learning_prompt)
+                        with st.chat_message("assistant"):
+                            st.write(learning_response)
+                    except Exception as exc:
+                        st.error(f"Error: {exc}")

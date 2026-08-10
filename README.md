@@ -1,7 +1,7 @@
 # Clipboard Translator
 
 Fast clipboard translation through a host keyboard shortcut, plus a Streamlit
-window for translation history and chat-based revisions.
+window for translation history, chat-based revisions, and language coaching.
 
 ## Configuration
 
@@ -89,6 +89,8 @@ In the Streamlit window you can:
 - copy the current result back to the clipboard
 - review specific grammar, vocabulary, and natural-phrasing lessons generated
   from the source text and its translation
+- use the separate `Learning` tab to ask follow-up questions, request examples
+  or exercises, and get feedback from a persistent language-coaching chat
 - select previous translations from the sidebar
 - send feedback in chat to create revised translations
 - inspect revision history for each translation

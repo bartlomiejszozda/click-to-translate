@@ -77,7 +77,7 @@ def _learning_prompt(target_language: str) -> str:
         "- give one short new example the learner can reuse.\n\n"
         "Use clear Markdown with the headings `Main lessons`, `Useful vocabulary "
         "and phrasing`, and `Practice`. Include only sections that have useful "
-        "content. In `Practice`, give 1-2 very short exercises based on the main "
+        "content. In `Practice`, give multiple exercises based on the main "
         "lessons, followed by a short `Answers` subsection. "
         "Be concise, encouraging, and specific. Do not repeat the full translation. "
         "If the source is already excellent, say so and explain at most two subtle "
@@ -113,6 +113,72 @@ def generate_learning_suggestions(
                 ),
             },
         ],
+    )
+    return response.choices[0].message.content or ""
+
+
+def continue_learning_chat(
+    source_text: str,
+    translated_text: str,
+    learning_suggestions: str,
+    user_message: str,
+    target_language: str = DEFAULT_TARGET_LANGUAGE,
+    chat_messages=None,
+) -> str:
+    question = user_message.strip()
+    if not question:
+        return ""
+
+    target_language = target_language.strip() or DEFAULT_TARGET_LANGUAGE
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"You are a personal {target_language} tutor. Help the learner "
+                "understand and practice the language lessons from their text and "
+                "the coaching notes. Answer follow-up questions directly, explain "
+                "grammar and vocabulary in simple language, give natural examples, "
+                "create short exercises when useful, and check the learner's "
+                "answers. Adapt the explanation language to the learner's messages, "
+                f"but keep examples and practice focused on {target_language}. "
+                "Use concise Markdown. This is a learning conversation: do not "
+                "revise or update the saved translation."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "Learning context:\n\n"
+                "Source text:\n"
+                f"{source_text.strip()}\n\n"
+                f"Final {target_language} text:\n"
+                f"{translated_text.strip()}\n\n"
+                "Initial learning suggestions:\n"
+                f"{learning_suggestions.strip() or 'No suggestions are available.'}"
+            ),
+        },
+        {
+            "role": "assistant",
+            "content": (
+                "I understand the learning context. I will tutor the learner "
+                "without changing the saved translation."
+            ),
+        },
+    ]
+
+    for message in (chat_messages or [])[-20:]:
+        if message["role"] in {"user", "assistant"}:
+            messages.append(
+                {
+                    "role": message["role"],
+                    "content": message["content"],
+                }
+            )
+
+    messages.append({"role": "user", "content": question})
+    response = _client().chat.completions.create(
+        model=get_model_name(),
+        messages=messages,
     )
     return response.choices[0].message.content or ""
 
