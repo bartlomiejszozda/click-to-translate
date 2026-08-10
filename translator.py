@@ -58,7 +58,6 @@ def translate_text(text: str, target_language: str = DEFAULT_TARGET_LANGUAGE) ->
                 "content": cleaned_text,
             },
         ],
-        temperature=0.2,
     )
     return response.choices[0].message.content
 
@@ -120,6 +119,5 @@ def refine_translation(
     response = _client().chat.completions.create(
         model=get_model_name(),
         messages=messages,
-        temperature=0.2,
     )
     return response.choices[0].message.content

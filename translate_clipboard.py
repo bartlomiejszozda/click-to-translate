@@ -1,5 +1,6 @@
 import argparse
 import sys
+import traceback
 
 from clipboard_io import read_clipboard, write_clipboard
 from history_store import create_translation, update_clipboard_status
@@ -30,7 +31,29 @@ def parse_args():
         action="store_true",
         help="Do not print the translated result.",
     )
+    parser.add_argument(
+        "--debug",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Print a full traceback when an error occurs (default: on).",
+    )
     return parser.parse_args()
+
+
+def print_error(exc: Exception, debug: bool = True) -> None:
+    if debug:
+        traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+        return
+
+    print(f"Error ({type(exc).__name__}): {exc}", file=sys.stderr)
+
+    seen = {id(exc)}
+    cause = exc.__cause__ or exc.__context__
+    while cause is not None and id(cause) not in seen:
+        print(f"Caused by {type(cause).__name__}: {cause}", file=sys.stderr)
+        seen.add(id(cause))
+        cause = cause.__cause__ or cause.__context__
+
 
 def main():
     args = parse_args()
@@ -61,7 +84,7 @@ def main():
             write_clipboard(result)
             update_clipboard_status(translation_id, True)
     except Exception as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        print_error(exc, debug=args.debug)
         return 1
     return 0
 
