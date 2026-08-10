@@ -10,10 +10,12 @@ from history_store import (
     init_db,
     list_translations,
     update_clipboard_status,
+    update_learning_suggestions,
     update_translation_from_chat,
 )
 from translator import (
     DEFAULT_TARGET_LANGUAGE,
+    generate_learning_suggestions,
     get_model_name,
     refine_translation,
     translate_text,
@@ -31,6 +33,7 @@ def init_state() -> None:
         "translated_text": "",
         "target_language": DEFAULT_TARGET_LANGUAGE,
         "notice": None,
+        "warning": None,
         "draft_mode": False,
     }
     for key, value in defaults.items():
@@ -76,6 +79,7 @@ def save_new_translation(
     target_language: str,
     origin: str,
     copied_to_clipboard: bool = False,
+    learning_suggestions: str = "",
 ) -> int:
     translation_id = create_translation(
         source_text=source_text,
@@ -84,11 +88,37 @@ def save_new_translation(
         model=get_model_name(),
         origin=origin,
         copied_to_clipboard=copied_to_clipboard,
+        learning_suggestions=learning_suggestions,
     )
     st.session_state.selected_translation_id = translation_id
     st.session_state.source_text = source_text
     st.session_state.translated_text = translated_text
     st.session_state.draft_mode = False
+    return translation_id
+
+
+def translate_and_save(source_text: str, target_language: str, origin: str) -> int:
+    translated_text = translate_text(source_text, target_language)
+    translation_id = save_new_translation(
+        source_text=source_text,
+        translated_text=translated_text,
+        target_language=target_language,
+        origin=origin,
+    )
+
+    try:
+        learning_suggestions = generate_learning_suggestions(
+            source_text,
+            translated_text,
+            target_language,
+        )
+        update_learning_suggestions(translation_id, learning_suggestions)
+    except Exception as exc:
+        st.session_state.warning = (
+            f"Translation #{translation_id} was saved, but learning suggestions "
+            f"could not be generated: {exc}"
+        )
+
     return translation_id
 
 
@@ -155,6 +185,10 @@ if st.session_state.notice:
     st.success(st.session_state.notice)
     st.session_state.notice = None
 
+if st.session_state.warning:
+    st.warning(st.session_state.warning)
+    st.session_state.warning = None
+
 st.text_input(
     "Target language",
     key="target_language",
@@ -186,15 +220,13 @@ if new_translation_clicked:
     st.rerun()
 
 if read_clipboard_clicked:
-    with st.spinner("Reading clipboard and translating..."):
+    with st.spinner("Translating and preparing learning suggestions..."):
         try:
             source_text = read_clipboard()
-            translated_text = translate_text(source_text, st.session_state.target_language)
-            translation_id = save_new_translation(
-                source_text=source_text,
-                translated_text=translated_text,
-                target_language=st.session_state.target_language,
-                origin="streamlit-clipboard",
+            translation_id = translate_and_save(
+                source_text,
+                st.session_state.target_language,
+                "streamlit-clipboard",
             )
             st.session_state.notice = f"Saved translation #{translation_id}."
             st.rerun()
@@ -208,14 +240,12 @@ if translate_clicked:
     if not source_text.strip():
         st.warning("Source text is empty.")
     else:
-        with st.spinner("Translating..."):
+        with st.spinner("Translating and preparing learning suggestions..."):
             try:
-                translated_text = translate_text(source_text, st.session_state.target_language)
-                translation_id = save_new_translation(
-                    source_text=source_text,
-                    translated_text=translated_text,
-                    target_language=st.session_state.target_language,
-                    origin="streamlit-manual",
+                translation_id = translate_and_save(
+                    source_text,
+                    st.session_state.target_language,
+                    "streamlit-manual",
                 )
                 st.session_state.notice = f"Saved translation #{translation_id}."
                 st.rerun()
@@ -242,6 +272,18 @@ if st.session_state.translated_text:
     )
 
 selected_id = st.session_state.selected_translation_id
+if selected_id is not None:
+    selected_item = get_translation(selected_id)
+    with st.container(border=True):
+        st.subheader("Learning suggestions")
+        if selected_item and selected_item["learning_suggestions"]:
+            st.markdown(selected_item["learning_suggestions"])
+        else:
+            st.caption(
+                "No suggestions are saved yet. For a new shortcut translation, "
+                "refresh the page in a moment while generation finishes."
+            )
+
 if selected_id is not None:
     st.subheader("Chat refinement")
 

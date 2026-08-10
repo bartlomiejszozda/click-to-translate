@@ -44,6 +44,7 @@ def init_db() -> None:
                 source_text TEXT NOT NULL,
                 target_language TEXT NOT NULL,
                 current_translation TEXT NOT NULL,
+                learning_suggestions TEXT NOT NULL DEFAULT '',
                 model TEXT NOT NULL,
                 origin TEXT NOT NULL,
                 -- Tracks copy actions performed from inside the Python app.
@@ -81,6 +82,16 @@ def init_db() -> None:
                 ON chat_messages (translation_id, created_at ASC);
             """
         )
+        translation_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(translations)")
+        }
+        if "learning_suggestions" not in translation_columns:
+            conn.execute(
+                """
+                ALTER TABLE translations
+                ADD COLUMN learning_suggestions TEXT NOT NULL DEFAULT ''
+                """
+            )
         conn.commit()
 
 
@@ -95,6 +106,7 @@ def create_translation(
     model: str,
     origin: str,
     copied_to_clipboard: bool = False,
+    learning_suggestions: str = "",
 ) -> int:
     init_db()
     now = utc_now()
@@ -107,11 +119,12 @@ def create_translation(
                 source_text,
                 target_language,
                 current_translation,
+                learning_suggestions,
                 model,
                 origin,
                 copied_to_clipboard
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 now,
@@ -119,6 +132,7 @@ def create_translation(
                 source_text,
                 target_language,
                 translated_text,
+                learning_suggestions,
                 model,
                 origin,
                 int(copied_to_clipboard),
@@ -153,6 +167,7 @@ def list_translations(limit: int = 50):
                 source_text,
                 target_language,
                 current_translation,
+                learning_suggestions,
                 model,
                 origin,
                 copied_to_clipboard
@@ -177,6 +192,7 @@ def get_translation(translation_id: int):
                 source_text,
                 target_language,
                 current_translation,
+                learning_suggestions,
                 model,
                 origin,
                 copied_to_clipboard
@@ -286,5 +302,22 @@ def update_clipboard_status(translation_id: int, copied_to_clipboard: bool) -> N
             WHERE id = ?
             """,
             (int(copied_to_clipboard), utc_now(), translation_id),
+        )
+        conn.commit()
+
+
+def update_learning_suggestions(
+    translation_id: int, learning_suggestions: str
+) -> None:
+    init_db()
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE translations
+            SET learning_suggestions = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (learning_suggestions, utc_now(), translation_id),
         )
         conn.commit()

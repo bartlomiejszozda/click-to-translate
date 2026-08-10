@@ -67,9 +67,12 @@ Usage:
 3. The running Docker container translates the clipboard.
 4. The translated text is copied back to the clipboard.
 5. Paste it with `Ctrl+V`.
+6. Learning suggestions are generated in the background and saved with the
+   translation for later review in Streamlit.
 
 The shortcut also saves the translation to the same SQLite history used by the
-Streamlit app.
+Streamlit app. Background generation keeps the copy-and-paste flow fast; refresh
+Streamlit if the learning suggestions are still being prepared.
 
 To target another language from the shortcut:
 
@@ -84,6 +87,8 @@ In the Streamlit window you can:
 - translate clipboard text with `Read + translate`
 - translate manually edited text with `Translate current text`
 - copy the current result back to the clipboard
+- review specific grammar, vocabulary, and natural-phrasing lessons generated
+  from the source text and its translation
 - select previous translations from the sidebar
 - send feedback in chat to create revised translations
 - inspect revision history for each translation

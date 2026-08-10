@@ -1,9 +1,15 @@
 import argparse
+import subprocess
 import sys
 import traceback
+from pathlib import Path
 
 from clipboard_io import read_clipboard, write_clipboard
-from history_store import create_translation, update_clipboard_status
+from history_store import (
+    create_translation,
+    update_clipboard_status,
+    update_learning_suggestions,
+)
 from translator import DEFAULT_TARGET_LANGUAGE, get_model_name, translate_text
 
 
@@ -55,6 +61,29 @@ def print_error(exc: Exception, debug: bool = True) -> None:
         cause = cause.__cause__ or cause.__context__
 
 
+def start_learning_generation(translation_id: int) -> None:
+    worker = Path(__file__).with_name("generate_learning.py")
+    try:
+        subprocess.Popen(
+            [sys.executable, str(worker), str(translation_id)],
+            cwd=worker.parent,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            close_fds=True,
+        )
+    except OSError as exc:
+        update_learning_suggestions(
+            translation_id,
+            "_Learning suggestions could not be started for this translation._",
+        )
+        print(
+            f"Warning: could not start learning-suggestions worker: {exc}",
+            file=sys.stderr,
+        )
+
+
 def main():
     args = parse_args()
 
@@ -79,6 +108,7 @@ def main():
             # starts false and is only updated when Python itself writes xclip.
             copied_to_clipboard=False,
         )
+        start_learning_generation(translation_id)
 
         if should_copy:
             write_clipboard(result)

@@ -62,6 +62,61 @@ def translate_text(text: str, target_language: str = DEFAULT_TARGET_LANGUAGE) ->
     return response.choices[0].message.content
 
 
+def _learning_prompt(target_language: str) -> str:
+    return (
+        "You are a supportive language coach. Compare the learner's source text "
+        f"with the final {target_language} version and identify what the learner "
+        "should study to write more accurately and naturally.\n\n"
+        "Focus only on lessons supported by this specific example, including any "
+        "useful grammar, vocabulary, collocations, idioms, word choice, register, "
+        "clarity, or natural phrasing. Prioritize the most valuable points and "
+        "ignore trivial differences that are merely matters of taste.\n\n"
+        "For each point:\n"
+        "- quote a short relevant phrase from the source and its improved form;\n"
+        "- explain the rule or usage in simple language;\n"
+        "- give one short new example the learner can reuse.\n\n"
+        "Use clear Markdown with the headings `Main lessons`, `Useful vocabulary "
+        "and phrasing`, and `Practice`. Include only sections that have useful "
+        "content. In `Practice`, give 1-2 very short exercises based on the main "
+        "lessons, followed by a short `Answers` subsection. "
+        "Be concise, encouraging, and specific. Do not repeat the full translation. "
+        "If the source is already excellent, say so and explain at most two subtle "
+        "ways to make it sound even more natural."
+    )
+
+
+def generate_learning_suggestions(
+    source_text: str,
+    translated_text: str,
+    target_language: str = DEFAULT_TARGET_LANGUAGE,
+) -> str:
+    source_text = source_text.strip()
+    translated_text = translated_text.strip()
+    if not source_text or not translated_text:
+        return ""
+
+    target_language = target_language.strip() or DEFAULT_TARGET_LANGUAGE
+    response = _client().chat.completions.create(
+        model=get_model_name(),
+        messages=[
+            {
+                "role": "system",
+                "content": _learning_prompt(target_language),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Source text written by the learner:\n"
+                    f"{source_text}\n\n"
+                    f"Final {target_language} version:\n"
+                    f"{translated_text}"
+                ),
+            },
+        ],
+    )
+    return response.choices[0].message.content or ""
+
+
 def refine_translation(
     source_text: str,
     current_translation: str,
