@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import streamlit as st
 
 from clipboard_io import ClipboardError, read_clipboard, write_clipboard
@@ -10,7 +12,9 @@ from history_store import (
     get_revisions,
     get_translation,
     init_db,
+    list_source_texts_for_export,
     list_translations,
+    mark_source_texts_exported,
     update_clipboard_status,
     update_learning_suggestions,
     update_translation_from_chat,
@@ -56,9 +60,41 @@ def compact_time(value: str) -> str:
 
 
 def format_history_item(item) -> str:
+    export_marker = "exported " if item["source_exported_at"] else ""
     return (
-        f"#{item['id']} {compact_time(item['updated_at'])} "
+        f"{export_marker}#{item['id']} {compact_time(item['updated_at'])} "
         f"{item['target_language']} - {snippet(item['source_text'])}"
+    )
+
+
+def build_source_export(items, generated_at: str) -> str:
+    lines = [
+        "SOURCE TEXT EXPORT",
+        f"Generated: {generated_at}",
+        f"Writings: {len(items)}",
+        "",
+    ]
+    for item in items:
+        lines.extend(
+            [
+                "=" * 80,
+                f"Writing #{item['id']}",
+                f"Created: {item['created_at']}",
+                f"Target language: {item['target_language']}",
+                "=" * 80,
+                "",
+                item["source_text"],
+                "",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def record_source_export(translation_ids) -> None:
+    mark_source_texts_exported(translation_ids)
+    st.session_state.notice = (
+        f"Exported {len(translation_ids)} saved source "
+        f"{'text' if len(translation_ids) == 1 else 'texts'}."
     )
 
 
@@ -128,6 +164,7 @@ def translate_and_save(source_text: str, target_language: str, origin: str) -> i
 init_state()
 
 history_items = list_translations(limit=50)
+source_export_items = list_source_texts_for_export()
 if (
     st.session_state.selected_translation_id is None
     and history_items
@@ -136,6 +173,54 @@ if (
     load_translation(history_items[0]["id"])
 
 with st.sidebar:
+    st.subheader("Export")
+    export_table = [
+        {
+            "Status": "exported" if item["source_exported_at"] else "",
+            "ID": item["id"],
+            "Created": compact_time(item["created_at"]),
+            "Source": snippet(item["source_text"], length=80),
+        }
+        for item in source_export_items
+    ]
+    export_selection = st.dataframe(
+        export_table,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="multi-row",
+        key="source_export_selection",
+        use_container_width=True,
+        height=min(320, 36 + 35 * max(len(export_table), 1)),
+    )
+    selected_export_items = [
+        source_export_items[index] for index in export_selection.selection.rows
+    ]
+    export_generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    export_ids = tuple(item["id"] for item in selected_export_items)
+    st.download_button(
+        f"Export selected ({len(selected_export_items)})",
+        data=build_source_export(selected_export_items, export_generated_at),
+        file_name=f"source-texts-{export_generated_at[:10]}.txt",
+        mime="text/plain",
+        disabled=not selected_export_items,
+        on_click=record_source_export,
+        args=(export_ids,),
+        use_container_width=True,
+    )
+    st.caption(
+        "Ctrl-click to select multiple rows, Shift-click to select a range, "
+        "or use the header checkbox to select all."
+    )
+    exported_count = sum(
+        item["source_exported_at"] is not None for item in source_export_items
+    )
+    st.caption(
+        f"{len(source_export_items)} saved writings · {exported_count} marked exported"
+    )
+    if history_items:
+        st.caption("“exported” means that source text was included in an export.")
+
+    st.divider()
     st.header("History")
 
     if st.button("New draft", use_container_width=True):
@@ -270,10 +355,18 @@ if selected_id is None:
     st.text_area("Source text", height=180, key="source_text")
     st.caption("Translate text to start a history item and chat about it.")
 else:
+    selected_item = get_translation(selected_id)
     translation_tab, learning_tab = st.tabs(["Translation", "Learning"])
 
     with translation_tab:
         st.text_area("Source text", height=180, key="source_text")
+        if selected_item and selected_item["source_exported_at"]:
+            st.caption(
+                "Source text last exported "
+                f"{compact_time(selected_item['source_exported_at'])} UTC."
+            )
+        else:
+            st.caption("Source text has not been exported yet.")
 
         if st.session_state.translated_text:
             st.text_area(
@@ -331,7 +424,6 @@ else:
                     st.text(revision["translation_text"])
 
     with learning_tab:
-        selected_item = get_translation(selected_id)
         st.subheader("Learning suggestions")
         if selected_item and selected_item["learning_suggestions"]:
             with st.container(border=True):

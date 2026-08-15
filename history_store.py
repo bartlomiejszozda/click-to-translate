@@ -42,6 +42,7 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 source_text TEXT NOT NULL,
+                source_exported_at TEXT,
                 target_language TEXT NOT NULL,
                 current_translation TEXT NOT NULL,
                 learning_suggestions TEXT NOT NULL DEFAULT '',
@@ -103,6 +104,13 @@ def init_db() -> None:
                 """
                 ALTER TABLE translations
                 ADD COLUMN learning_suggestions TEXT NOT NULL DEFAULT ''
+                """
+            )
+        if "source_exported_at" not in translation_columns:
+            conn.execute(
+                """
+                ALTER TABLE translations
+                ADD COLUMN source_exported_at TEXT
                 """
             )
         conn.commit()
@@ -178,6 +186,7 @@ def list_translations(limit: int = 50):
                 created_at,
                 updated_at,
                 source_text,
+                source_exported_at,
                 target_language,
                 current_translation,
                 learning_suggestions,
@@ -193,6 +202,38 @@ def list_translations(limit: int = 50):
         return [dict(row) for row in rows]
 
 
+def list_source_texts_for_export():
+    init_db()
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, created_at, source_text, target_language, source_exported_at
+            FROM translations
+            ORDER BY created_at ASC, id ASC
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def mark_source_texts_exported(translation_ids) -> None:
+    translation_ids = tuple(translation_ids)
+    if not translation_ids:
+        return
+
+    init_db()
+    placeholders = ", ".join("?" for _ in translation_ids)
+    with connect() as conn:
+        conn.execute(
+            f"""
+            UPDATE translations
+            SET source_exported_at = ?
+            WHERE id IN ({placeholders})
+            """,
+            (utc_now(), *translation_ids),
+        )
+        conn.commit()
+
+
 def get_translation(translation_id: int):
     init_db()
     with connect() as conn:
@@ -203,6 +244,7 @@ def get_translation(translation_id: int):
                 created_at,
                 updated_at,
                 source_text,
+                source_exported_at,
                 target_language,
                 current_translation,
                 learning_suggestions,

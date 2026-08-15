@@ -94,6 +94,9 @@ In the Streamlit window you can:
 - select previous translations from the sidebar
 - send feedback in chat to create revised translations
 - inspect revision history for each translation
+- select individual writings, a range, or all saved source texts and export
+  them as one text file; exported history items are marked with a check and
+  retain their latest export time
 
 ## Notes
 
