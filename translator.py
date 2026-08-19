@@ -154,13 +154,6 @@ def continue_learning_chat(
                 f"{learning_suggestions.strip() or 'No suggestions are available.'}"
             ),
         },
-        {
-            "role": "assistant",
-            "content": (
-                "I understand the learning context. I will tutor the learner "
-                "without changing the saved translation."
-            ),
-        },
     ]
 
     for message in (chat_messages or [])[-20:]:
