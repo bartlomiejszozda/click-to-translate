@@ -14,6 +14,24 @@ API_KEY=sk-...
 Optional: `MODEL`, `OPENAI_BASE_URL`
 Restart the container after editing the file.
 
+## Prompts
+
+Model instructions are plain-text templates in `prompts/`:
+
+- `translation.txt`
+- `translation_chat.txt`
+- `learning_suggestions.txt`
+- `learning_chat.txt`
+
+Each file uses `[SYSTEM]` and, where needed, `[USER]` sections with named
+placeholders such as `{target_language}`. Templates are read for each request,
+so prompt edits made through the development bind mount do not require an image
+rebuild or application restart.
+
+Translation behavior lives in `translator.py`, learning behavior in
+`learning.py`, and shared OpenAI configuration and response handling in
+`llm_client.py`.
+
 ## Build
 
 ```bash
@@ -102,3 +120,12 @@ In the Streamlit window you can:
 
 This setup uses `xclip`, so it is designed for Linux/X11 or XWayland. Pure
 Wayland sessions may need a different clipboard backend.
+
+Run the standard-library `unittest` suite with the project environment:
+
+```bash
+.venv/bin/python -m unittest discover -s tests
+```
+
+See `REFACTORING_NOTES.md` for known behavior gaps and prioritized follow-up
+work.

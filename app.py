@@ -19,11 +19,12 @@ from history_store import (
     update_learning_suggestions,
     update_translation_from_chat,
 )
-from translator import (
-    DEFAULT_TARGET_LANGUAGE,
+from learning import (
     continue_learning_chat,
     generate_learning_suggestions,
-    get_model_name,
+)
+from llm_client import DEFAULT_TARGET_LANGUAGE, get_model_name
+from translator import (
     refine_translation,
     translate_text,
 )

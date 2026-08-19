@@ -1,7 +1,7 @@
 import argparse
 
 from history_store import get_translation, update_learning_suggestions
-from translator import generate_learning_suggestions
+from learning import generate_learning_suggestions
 
 
 def parse_args():

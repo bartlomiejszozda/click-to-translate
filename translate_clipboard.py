@@ -10,7 +10,8 @@ from history_store import (
     update_clipboard_status,
     update_learning_suggestions,
 )
-from translator import DEFAULT_TARGET_LANGUAGE, get_model_name, translate_text
+from llm_client import DEFAULT_TARGET_LANGUAGE, get_model_name
+from translator import translate_text
 
 
 def parse_args():
