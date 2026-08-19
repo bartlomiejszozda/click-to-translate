@@ -308,7 +308,6 @@ def update_translation_from_chat(
     translation_id: int,
     user_message: str,
     assistant_message: str,
-    revised_translation: str,
 ) -> None:
     init_db()
     now = utc_now()
@@ -339,24 +338,11 @@ def update_translation_from_chat(
         )
         conn.execute(
             """
-            INSERT INTO revisions (
-                translation_id,
-                created_at,
-                translation_text,
-                note
-            )
-            VALUES (?, ?, ?, ?)
-            """,
-            (translation_id, now, revised_translation, user_message),
-        )
-        conn.execute(
-            """
             UPDATE translations
-            SET current_translation = ?,
-                updated_at = ?
+            SET updated_at = ?
             WHERE id = ?
             """,
-            (revised_translation, now, translation_id),
+            (now, translation_id),
         )
         conn.commit()
 

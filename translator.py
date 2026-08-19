@@ -32,12 +32,9 @@ def _client():
 
 def _system_prompt(target_language: str) -> str:
     return (
-        f"You are a professional translator and editor. Translate the user's text "
-        f"to {target_language}. Preserve the original meaning, tone, formatting, "
-        f"and technical terms. If the text is already natural {target_language}, "
-        f"return it unchanged. If it is already {target_language} but awkward, "
-        f"improve grammar, clarity, fluency, and natural tone without changing "
-        f"the meaning. Return only the final text."
+        f"Enhance user's text to make it more natural and fix mistakes."
+        f"If the text is already polished and natural {target_language}, return it unchanged. "
+        f"Return only the final text."
     )
 
 
@@ -193,17 +190,24 @@ def refine_translation(
     target_language = target_language.strip() or DEFAULT_TARGET_LANGUAGE
     feedback = user_feedback.strip()
     if not feedback:
-        return current_translation
+        return ""
 
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a professional translation editor. Revise the current "
-                f"{target_language} translation according to the user's feedback. "
-                "Preserve the original meaning unless the user explicitly asks "
-                "for a tone, style, or wording change. Return only the complete "
-                "revised translation, without explanations or markdown."
+                "You are a professional translator and collaborative language "
+                f"assistant. Help the user discuss and improve the current "
+                f"{target_language} translation while considering the original "
+                "text and the conversation history. Infer the user's intent from "
+                "their message. Unless they clearly ask for information or an "
+                "explanation, treat comments, preferences, objections, and other "
+                "feedback as requests to improve the translation; propose a "
+                "revised version and briefly explain the relevant changes. When "
+                "the user clearly asks about meaning, grammar, vocabulary, style, "
+                "or another topic, answer the question directly and do not revise "
+                "the translation unless doing so helps answer the request or they "
+                "also ask for a revision. Reply naturally in concise Markdown."
             ),
         },
         {
@@ -226,16 +230,7 @@ def refine_translation(
                 }
             )
 
-    messages.append(
-        {
-            "role": "user",
-            "content": (
-                "Apply this new feedback to the current translation:\n"
-                f"{feedback}\n\n"
-                "Return only the complete revised translation."
-            ),
-        }
-    )
+    messages.append({"role": "user", "content": feedback})
 
     response = _client().chat.completions.create(
         model=get_model_name(),

@@ -375,17 +375,17 @@ else:
                 height=180,
             )
 
-        st.subheader("Chat refinement")
+        st.subheader("Translation chat")
         messages = get_chat_messages(selected_id)
         if not messages:
-            st.caption("No feedback yet for this translation.")
+            st.caption("Ask anything about the translation.")
 
         for message in messages:
             with st.chat_message(message["role"]):
                 st.write(message["content"])
 
         prompt = st.chat_input(
-            "Tell the translator what to change...",
+            "Ask anything about this translation...",
             key=f"translation_chat_input_{selected_id}",
         )
         if prompt:
@@ -393,9 +393,9 @@ else:
             if item is None:
                 st.error("Selected translation was not found.")
             else:
-                with st.spinner("Revising translation..."):
+                with st.spinner("Preparing a reply..."):
                     try:
-                        revised_translation = refine_translation(
+                        reply = refine_translation(
                             source_text=item["source_text"],
                             current_translation=item["current_translation"],
                             user_feedback=prompt,
@@ -405,11 +405,8 @@ else:
                         update_translation_from_chat(
                             translation_id=selected_id,
                             user_message=prompt,
-                            assistant_message=revised_translation,
-                            revised_translation=revised_translation,
+                            assistant_message=reply,
                         )
-                        st.session_state.translated_text = revised_translation
-                        st.session_state.notice = "Saved revised translation."
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Error: {exc}")
